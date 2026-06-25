@@ -1,27 +1,37 @@
-# Sensitive files — never commit these
+# Sensitive
 .env
+.env.save
 *.env
+
+# Database
 data/*.db
 data/*.db-wal
 data/*.db-shm
+
+# Logs
 logs/
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 venv/
 .venv/
-*.egg-info/
-.DS_Store
 
-# Backtest data
-backtesting/data/
-backtesting/_extracted_*/
-
-# API keys and credentials
-config/secrets.py
+# Backups and archives
 *.bak*
 *.tar.gz
-.env.save
+AtlasFX_Phase*.tar.gz
+
+# Backtesting extracted data
+backtesting/_extracted_*/
+backtesting/data/
+
+# Mac
+.DS_Store
+
+# Misc
+test
 CLAUDE.md
-data/histdata/
-data/historical/
+{config,data
+live_trading/
