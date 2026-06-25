@@ -1,0 +1,129 @@
+"""
+strategies/strategy_ema_pullback.py
+AtlasFX EMA Pullback in Trend Strategy
+Validated: AUD/USD 72.2% | GBP/USD 64.3% | USD/JPY 61.5%
+"""
+from __future__ import annotations
+import math
+from datetime import datetime
+import pandas as pd
+import numpy as np
+from logs.logger import get_logger
+from strategies.base import BaseStrategy, StrategyMetadata, TradeSignal
+from strategies.pair_config import EMA_PULLBACK_PAIRS
+log = get_logger(__name__)
+
+# EMA Pullback — 23 pairs validated via 3yr backtest (2023-2025)
+# All EV > £600/trade at 2.5R | See pair_config.py for full details
+VALIDATED_INSTRUMENTS = EMA_PULLBACK_PAIRS
+
+def _safe(v):
+    try: x=float(v); return None if math.isnan(x) or math.isinf(x) else x
+    except: return None
+
+def _adx(high,low,close,p=14):
+    if len(high)<p*2: return 0.0
+    try:
+        tr=pd.concat([high-low,abs(high-close.shift()),abs(low-close.shift())],axis=1).max(axis=1)
+        up=high.diff(); dn=-low.diff()
+        dmp=pd.Series(np.where((up>dn)&(up>0),up,0),index=high.index)
+        dmm=pd.Series(np.where((dn>up)&(dn>0),dn,0),index=high.index)
+        as_=tr.ewm(span=p,adjust=False).mean()
+        dip=(dmp.ewm(span=p,adjust=False).mean()/as_.replace(0,0.0001))*100
+        dim=(dmm.ewm(span=p,adjust=False).mean()/as_.replace(0,0.0001))*100
+        dx=(abs(dip-dim)/(dip+dim).replace(0,0.0001))*100
+        v=_safe(dx.ewm(span=p,adjust=False).mean().iloc[-1]); return v or 0.0
+    except: return 0.0
+
+def _atr(high,low,close,p=14):
+    try:
+        tr=pd.concat([high-low,abs(high-close.shift()),abs(low-close.shift())],axis=1).max(axis=1)
+        v=_safe(tr.ewm(span=p,adjust=False).mean().iloc[-1]); return v or 0.0
+    except: return 0.0
+
+def _rsi(close,p=14):
+    try:
+        d=close.diff(); g=d.clip(lower=0).ewm(span=p,adjust=False).mean()
+        l=(-d.clip(upper=0)).ewm(span=p,adjust=False).mean()
+        v=_safe((100-(100/(1+g/l.replace(0,0.0001)))).iloc[-1]); return v or 50.0
+    except: return 50.0
+
+class EMAPullbackStrategy(BaseStrategy):
+    METADATA=StrategyMetadata(
+        strategy_id="EMA_PULLBACK_V1",
+        name="EMA Pullback in Trend",
+        version="1.0.0",
+        description="Validated: AUD/USD 72.2%, GBP/USD 64.3%, USD/JPY 61.5%",
+        instruments=VALIDATED_INSTRUMENTS,
+        timeframes=["H1"],
+        min_history_bars=210,
+    )
+    ADX_MIN=35; RSI_BUY_MIN=45; RSI_BUY_MAX=68
+    RSI_SELL_MIN=32; RSI_SELL_MAX=55
+    MOMENTUM_ATR_MULT=0.3; SL_ATR_MULT=1.0
+    TP_PULLBACK_MULT=2.5; MIN_SL_PIPS=5
+    TRADE_START_HOUR=7; TRADE_END_HOUR=16
+
+    def __init__(self,pip_size=0.0001):
+        super().__init__(); self.pip_size=pip_size; self._daily={}
+
+    def _get_pip(self, instrument):
+        if 'XAU' in instrument: return 1.0
+        if 'XAG' in instrument: return 0.01
+        if 'JPY' in instrument: return 0.01
+        return 0.0001
+
+    def generate_signal(self,data,instrument,timeframe,current_bar_index=-1):
+        if not self.validate_data(data): return None
+        if len(data)<self.METADATA.min_history_bars: return None
+        close=data["Close"]; high=data["High"]; low=data["Low"]; open_=data["Open"]
+        bar_time=data.index[-1]
+        try:
+            bt=bar_time if hasattr(bar_time,'hour') else pd.Timestamp(str(bar_time))
+            hour=bt.hour; dow=bt.weekday(); date_key=str(bt.date())
+        except: return None
+        if dow in [0,4]: return None
+        if not(self.TRADE_START_HOUR<=hour<self.TRADE_END_HOUR): return None
+        daily_count=self._daily.get(f"{instrument}_{date_key}",0)
+        if daily_count>=2: return None
+        e21=close.ewm(span=21,adjust=False).mean()
+        e50=close.ewm(span=50,adjust=False).mean()
+        e200=close.ewm(span=200,adjust=False).mean()
+        ce21=_safe(e21.iloc[-1]); ce50=_safe(e50.iloc[-1]); ce200=_safe(e200.iloc[-1])
+        pe21=_safe(e21.iloc[-2])
+        if any(x is None for x in [ce21,ce50,ce200,pe21]): return None
+        cclose=_safe(close.iloc[-1]); copen=_safe(open_.iloc[-1]); pclose=_safe(close.iloc[-2])
+        if any(x is None for x in [cclose,copen,pclose]): return None
+        adx=_adx(high,low,close)
+        if adx<self.ADX_MIN: return None
+        atr=_atr(high,low,close)
+        if atr<=0: return None
+        rsi=_rsi(close)
+        body=abs(cclose-copen)
+        if body<atr*self.MOMENTUM_ATR_MULT: return None
+        conf=min(0.65+(adx-self.ADX_MIN)/100,0.90)
+        if (ce21>ce50>ce200 and pclose<=pe21*1.0005 and cclose>ce21
+                and cclose>copen and self.RSI_BUY_MIN<=rsi<=self.RSI_BUY_MAX):
+            pullback_dist=abs(cclose-ce21)
+            sl=ce21-atr*self.SL_ATR_MULT; tp=cclose+pullback_dist*self.TP_PULLBACK_MULT
+            if abs(cclose-sl)<self.pip_size*self.MIN_SL_PIPS or tp<=cclose: return None
+            self._daily[f"{instrument}_{date_key}"]=daily_count+1
+            log.info("ema_pullback_signal",instrument=instrument,direction="BUY",adx=round(adx,1))
+            return TradeSignal(strategy_id=self.METADATA.strategy_id,instrument=instrument,
+                direction="BUY",entry_price=round(cclose,5),stop_loss=round(sl,5),
+                take_profit=round(tp,5),confidence=round(conf,2),timeframe=timeframe,
+                timestamp=bt if isinstance(bt,datetime) else datetime.utcnow(),
+                metadata={"adx":round(adx,1),"rsi":round(rsi,1),"setup":"ema_pullback_buy"})
+        if (ce21<ce50<ce200 and pclose>=pe21*0.9995 and cclose<ce21
+                and cclose<copen and self.RSI_SELL_MIN<=rsi<=self.RSI_SELL_MAX):
+            pullback_dist=abs(ce21-cclose)
+            sl=ce21+atr*self.SL_ATR_MULT; tp=cclose-pullback_dist*self.TP_PULLBACK_MULT
+            if abs(cclose-sl)<self.pip_size*self.MIN_SL_PIPS or tp>=cclose: return None
+            self._daily[f"{instrument}_{date_key}"]=daily_count+1
+            log.info("ema_pullback_signal",instrument=instrument,direction="SELL",adx=round(adx,1))
+            return TradeSignal(strategy_id=self.METADATA.strategy_id,instrument=instrument,
+                direction="SELL",entry_price=round(cclose,5),stop_loss=round(sl,5),
+                take_profit=round(tp,5),confidence=round(conf,2),timeframe=timeframe,
+                timestamp=bt if isinstance(bt,datetime) else datetime.utcnow(),
+                metadata={"adx":round(adx,1),"rsi":round(rsi,1),"setup":"ema_pullback_sell"})
+        return None

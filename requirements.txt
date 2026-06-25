@@ -1,0 +1,62 @@
+# AtlasFX — Python Dependencies
+# Install: pip install -r requirements.txt
+# Python 3.12+ required
+
+# ── Core ──────────────────────────────────────────────────────
+python-dotenv==1.0.1        # Environment variable loading
+pydantic==2.7.1             # Data validation and settings
+pydantic-settings==2.3.1    # Settings management from .env
+
+# ── Data & Numerics ───────────────────────────────────────────
+pandas==2.2.2               # Core data manipulation
+numpy==1.26.4               # Numerical computing
+yfinance==0.2.40            # Historical FX/market data (dev/research)
+aiohttp==3.9.5              # Async HTTP for broker APIs
+requests==2.32.3            # Sync HTTP
+pyarrow==16.1.0             # Fast parquet storage for OHLCV data
+
+# ── Database ──────────────────────────────────────────────────
+sqlalchemy==2.0.30          # ORM + raw SQL support
+alembic==1.13.1             # Database migrations
+
+# ── Scheduling ────────────────────────────────────────────────
+apscheduler==3.10.4         # Background job scheduling for trading agent
+
+# ── Backtesting & Analytics ───────────────────────────────────
+scipy==1.13.1               # Statistical analysis
+statsmodels==0.14.2         # Time series analysis
+
+# ── Dashboard ─────────────────────────────────────────────────
+fastapi==0.111.1            # Dashboard API
+uvicorn[standard]==0.30.1   # ASGI server
+jinja2==3.1.4               # HTML templating
+plotly==5.22.0              # Interactive charts
+kaleido==0.2.1              # Plotly static image export
+
+# ── Notifications ─────────────────────────────────────────────
+# Pushover: uses plain requests (no extra package)
+# SMTP: uses built-in smtplib
+
+# ── Logging ───────────────────────────────────────────────────
+structlog==24.2.0           # Structured logging
+
+# ── Testing ───────────────────────────────────────────────────
+pytest==8.2.2
+pytest-asyncio==0.23.7
+pytest-cov==5.0.0
+freezegun==1.5.1            # Freeze time in tests
+
+# ── Development Tools ─────────────────────────────────────────
+black==24.4.2               # Code formatting
+isort==5.13.2               # Import sorting
+mypy==1.10.0                # Type checking
+ruff==0.4.9                 # Fast linter
+
+# ── Optional: Production PostgreSQL ───────────────────────────
+# Uncomment for VPS production deployment:
+# psycopg2-binary==2.9.9
+
+# ── Optional: Technical Indicators ───────────────────────────
+# Uncomment if preferred over manual implementation:
+# ta==0.11.0                # Technical analysis library
+# pandas-ta==0.3.14b0       # Extended TA library
