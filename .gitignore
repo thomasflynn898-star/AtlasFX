@@ -19,3 +19,9 @@ backtesting/_extracted_*/
 
 # API keys and credentials
 config/secrets.py
+*.bak*
+*.tar.gz
+.env.save
+CLAUDE.md
+data/histdata/
+data/historical/
