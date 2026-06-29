@@ -230,6 +230,15 @@ class PaperTradingAgent:
                 except Exception as e:
                     log.error("scan_error",instrument=instrument,strategy=strat.METADATA.strategy_id,error=str(e))
         log.info("agent_scan_complete",scan=self._scan_count,open_positions=len(self._open_positions))
+        hour = datetime.utcnow().hour
+        if hour == 14:
+            log.info("london_session_complete",signals_today=self._health._signal_count,scan=self._scan_count)
+            if self._telegram and self._health._signal_count == 0:
+                self._telegram.send("London session closed — no signals fired today. Market conditions not met.", parse_mode="")
+        if hour == 17:
+            log.info("ny_session_complete",signals_today=self._health._signal_count,scan=self._scan_count)
+            if self._telegram and self._health._signal_count == 0:
+                self._telegram.send("NY session closed — no signals fired today.", parse_mode="")
 
     def _execute_signal(self, signal, instrument, pip_size):
         risk_pct=self._sizer.calculate_risk_pct(signal=signal,recent_trades=[],
