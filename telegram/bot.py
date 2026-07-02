@@ -632,7 +632,7 @@ class TelegramBot:
     def agent_started(self):
         self.send(f"🚀 AtlasFX Online\n"
                   f"London ORB + NY ORB + EMA Pullback\n"
-                  f"21 pairs | ~60% WR\n"
+                  f"27 pairs | 68.9% WR (walk-forward validated)\n"
                   f"{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", parse_mode="")
 
     def agent_stopped(self, reason):
