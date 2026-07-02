@@ -17,23 +17,7 @@ app = FastAPI(title="AtlasFX Pro", docs_url=None, redoc_url=None)
 analytics = PerformanceAnalytics()
 _broker: Optional[OANDABroker] = None
 
-# Auto-sync VPS database on startup
-import subprocess, threading, time as _time, os
-
-def _sync_db():
-    while True:
-        try:
-            subprocess.run(
-                ["scp", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes",
-                 "-i", os.path.expanduser("~/.ssh/atlasfx_vps"),
-                 "root@158.220.93.163:/opt/atlasfx/data/atlasfx.db",
-                 os.path.expanduser("~/Desktop/AtlasFX/data/atlasfx.db")],
-                capture_output=True, timeout=15)
-        except Exception:
-            pass
-        _time.sleep(60)
-
-threading.Thread(target=_sync_db, daemon=True, name="db-sync").start()
+# Dashboard runs on VPS — reads local database directly, no sync needed
 
 def get_broker():
     global _broker
