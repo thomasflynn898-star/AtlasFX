@@ -90,7 +90,31 @@ def api_prices():
 def api_stats(): return analytics.get_summary_stats()
 
 @app.get("/api/trades/open")
-def api_open_trades(): return analytics.get_open_trades()
+def api_open_trades():
+    # Try to get live data from OANDA for accurate entry prices and pip P&L
+    broker = get_broker()
+    if broker:
+        try:
+            trades = broker.get_open_trades()
+            result = []
+            for t in trades:
+                result.append({
+                    "id": t.trade_id,
+                    "instrument": t.instrument,
+                    "direction": t.direction,
+                    "entry_price": t.entry_price,
+                    "stop_loss": t.stop_loss,
+                    "take_profit": t.take_profit,
+                    "unrealised_pnl": t.unrealised_pnl,
+                    "units": t.units,
+                    "open_time": t.open_time.isoformat() if t.open_time else None,
+                    "status": "OPEN",
+                    "strategy_id": "LIVE"
+                })
+            return result
+        except Exception as e:
+            log.error("api_open_trades_oanda_failed", error=str(e))
+    return analytics.get_open_trades()
 
 @app.get("/api/trades/closed")
 def api_closed_trades():
